@@ -1,0 +1,14 @@
+abbaaaaabbba
+a
+b
+aaaaa
+bbbbbb
+aXbbbbbb
+aaabbb
+baaabbbbbbaabababbabbaaababbabbabbbbbaaa
+aaaaaaaaabbbbbbbbbbbaaaaabbbbbbaaaaaabbbababbbbbbbbbaaaabbabaaabbbabaabbbaababa
+babbaabbbaaabbbbaaaabbbbbaaaaabbbbbbaaaaaabbbbbbbaaaaaaabbbbbbbbaaaaaaaa
+
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aabbaabbaabbaabbaabbaabbaabbaabbaabaaaabbbaabbb
+XXXXX

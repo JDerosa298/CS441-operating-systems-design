@@ -1,0 +1,65 @@
+Contents:
+1) Files
+2) Building
+3) Using the example
+
+--------------------------------------------
+1) Files
+--------------------------------------------
+== Virtual Machine Files ==
+sunyat.c - primary SUNYAT virtual machine source
+sunyat.h - a number of defined values including opcodes.  This
+           file was created to share definitions between the 
+           virtual machine and the assembler.
+
+== Assembler Files ==
+sunyat-asm.lex - lexical/token analyzer... uses flex
+sunyat-asm.y - grammar/semantic analyser... uses the Lemon parser
+               generator whose source is included (lemon.c and 
+               lempar.c)
+token.h - definition of the assembler token structure shared 
+          between the lexer and parser
+amos.asm - example assembly application for the SUNYAT
+
+== Documentation ==
+programing_guide.pdf - architere and instruction overview
+"doc" folder - source files for creating the PDF, above
+
+--------------------------------------------
+2) Building
+--------------------------------------------
+
+The easy way... 
+"make all" or "make" builds the SUNYAT VM, sunyat-asm assembler, and example.  
+These can be individually built with "make sunyat", "make sunyat-asm", and
+"make example".
+
+To build the SUNYAT VM the hard (by hand) way...
+> gcc -o sunyat sunyat.c
+
+To build the sunyat-asm assembler the hard (by hand) way...
+[Step 1] Build the Lemon parser generator.  [Step 2] Generate the 
+tokenizer for our parser with flex.  [Step 3] Generate our parsing source. 
+[Step 4] Build the sunyat-asm assembler from the tokenizer and parser sources.  
+> gcc -o lemon lemon.c
+> flex -i sunyat-asm.lex
+> ./lemon sunyat-asm.y
+> gcc -o sunyat-asm lex.yy.c sunyat-asm.c -lfl
+
+"make clean" gets rid of the VM and assembler executables and any intermediate
+files that were generated during the build process.
+
+--------------------------------------------
+3)  Using the example, "amos.asm"
+--------------------------------------------
+
+> make example
+
+or...
+
+> ./sunyat-asm amos.asm
+> ./sunyat amos.rom
+
+
+
+
