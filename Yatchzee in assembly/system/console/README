@@ -1,0 +1,47 @@
+This is an example of a simple MiniAT system that makes use of the simple keyboard
+and simple terminal peripherals. The accompanying assembly file, "console.asm", 
+reads a byte at a time from the keyboard and writes a byte to the terminal. 
+Anything you type in, gets echo'd back out to you.  The simple keyboard is emulated
+using basic buffered input, so the assembly program will not read any characters 
+from the keyboard until the user presses the Enter key.
+
+If your building MiniAT from source, this example is compiled for you. Below is a
+linux terminal dump to show you how to use it, I assume you are in the root of the
+MiniAT repository.
+
+SIGINT or CTRL^C gets you out of the program.
+
+Their are two examples in this directory. The first one requires the programmer to
+manually transfer the data back and forth between the peripherals(console.c).
+The other example (console_connector.c) uses a "connector" to permanently wire the
+connection back and forth.
+
+LINUX INSTRUCTIONS:
+
+FROM PACKAGE:
+$ cd /usr/share/libminiat/examples/console
+$ scons
+$ masm simple_term.asm 
+$ ls
+console  main.c  main.o  README  SConstruct  simple_term.asm  simple_term.bin
+$ ./console ./simple_term.bin 
+MiniAT Echo Terminal, type a string hit enter and the miniat echo's it back!
+Hello World
+Hello World
+CTRL^C
+
+FROM SOURCE:
+Assuming in miniat root directory
+$ export /usr/share/libminiat/examples/console
+$ ./out/exe/miniat_console ./out/bin/simple_term.bin 
+$ ./out/exe/miniat_console ./out/bin/simple_term.bin 
+MiniAT Echo Terminal, type a string hit enter and the miniat echo's it back!
+Hello world
+Hello world
+This is great
+This is great
+CTRL^C
+
+WINDOWS INSTRUCTIONS:
+TODO
+

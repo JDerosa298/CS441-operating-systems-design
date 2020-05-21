@@ -1,0 +1,7 @@
+Import('*')
+
+NAME = 'simple_term'
+INC =  [ '#/vm/inc' ]
+SRC = Glob('*.c')
+
+buildSharedLibrary(NAME, SRC, CPPPATH=INC)

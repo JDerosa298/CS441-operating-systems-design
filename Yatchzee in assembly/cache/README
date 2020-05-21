@@ -1,0 +1,35 @@
+MiniAT Example Caches
+
+These lua files can be passed to the miniat_new() and miniat_file_new()
+functions to implement a cache. The cache functions adhere to the following
+interface pseudo code:
+
+integer cache_access(boolean is_instruction, boolean is_write, integer address)
+
+cache_access() returns an integer for setting the stall duration to access
+memory. For a cache hit, it would return a 1, for a miss, it can return any
+positive number greater than one.
+
+Rather counter intuitively, a one is returned on a hit because the miniat includes
+the current clock cycle as part of the delay.
+
+Parameters:
+  is_instruction(boolean): True if its on an instruction access, False for data access.
+  is_write(boolean): True if the access is a write, False if its a read.
+  address(integer): The address the access is for.
+
+Return:
+  A return of a 0 value indicates to use the
+  default cache miss duration for the particular memory
+  address.
+
+The hit.lua and miss.lua scripts provide working examples of
+the interface.
+
+The default stalls (defined in miniat_memory.c) are:
+
+RAM   - 2 cycles
+FLASH - 4 cycles
+ID*   - 2 cycles
+
+* ID is the virtual machine identification region and is read only.

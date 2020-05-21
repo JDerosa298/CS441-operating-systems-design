@@ -1,0 +1,439 @@
+import os
+import platform
+import shlex
+import subprocess
+import sys
+import SCons.Builder
+from SCons.Errors import UserError
+
+scripts = list()
+
+AddOption('--verbose',
+	dest='verbose',
+	action='store_true',
+	default=False,
+	help='Be verbose and show "raw" build commands')
+
+AddOption('--debugging',
+	dest='debugging',
+	nargs='?',
+	const='basic',
+	help='The default is to compile with debugging symbols, but a csv list of the following options can be added:'
+	'asan - use the Address Sanitizer feature of the compiler.')
+
+vars = Variables()
+vars.Add(ListVariable('buildmod', 'List of modules to build', 'none',
+                    ['python']))
+
+env = Environment(variables = vars, ENV = {'PATH' : os.environ['PATH']})
+
+rootdir = os.getcwd()
+tooldir = os.path.join(rootdir, "tools")
+builddir = os.path.join(tooldir, "build")
+outdir = os.path.join(rootdir, "out")
+exedir = os.path.join(outdir, "exe")
+libdir = os.path.join(outdir, "lib")
+bindir = os.path.join(outdir, "bin")
+docdir = os.path.join(outdir, "doc")
+cachedir = os.path.join(rootdir, "cache")
+
+env.PrependENVPath('PATH', exedir)
+env.Append(LIBPATH=libdir)
+env.Append(RPATH=libdir)
+env.Append(CFLAGS='-Wall -Werror -D_GNU_SOURCE')
+
+system = platform.system()
+
+VERBOSE = GetOption('verbose')
+DEBUGGING = GetOption('debugging')
+
+env.Clean(".", [
+	outdir,
+	os.path.join(builddir, "packageparser.pyc"),
+])
+
+def vprint(msg):
+	if VERBOSE:
+		print(msg)
+
+if not VERBOSE:
+	env['CCCOMSTR'] = "CC $TARGET"
+	env['LINKCOMSTR'] = "LD $TARGET"
+	env['SHCCCOMSTR'] = "CC $TARGET"
+	env['SHLINKCOMSTR'] = "LD $TARGET"
+	env['INSTALLSTR'] = "CP $TARGET"
+	env['LEMONCOMSTR'] = "LEMON $TARGET"
+	env['FLEXCOMSTR'] = "FLEX $TARGET"
+	env['MASHCOMSTR'] = "MASH $TARGET"
+	env['SWIGCOMSTR'] = "SWIG $TARGET"
+	env['ARCOMSTR'] = "AR $TARGET"
+	env['RANLIBCOMSTR'] = "RANLIB $TARGET"
+
+if DEBUGGING:
+	options = DEBUGGING.split(',')
+
+	# Always add -g on debugging builds
+	env.Append(CFLAGS="-g")
+
+	# basic might not be in the store when  an argument is passed, ie --debugging=asan
+	# is the same as --debugging=basic,asan
+	if "basic" in options:
+		options.remove("basic")
+
+	# if "feature" enabled, setup environment and
+	# remove from options list
+	if "asan" in options:
+		env.Append(CFLAGS="-fsanitize=address")
+		if(system == "Darwin"):
+			env.Append(LINKFLAGS="-fsanitize=address")
+		options.remove("asan")
+
+	# detect leftover options as invalid
+	if len(options) > 0:
+		print "Raising Build Error"
+		raise UserError("Unkown options: %s" %
+			(', '.join(e for e in options)))
+
+vprint("Verbose: " + str(VERBOSE))
+vprint("Debugging: " + str(DEBUGGING))
+
+# Add system
+_flag_map = {
+"CC" : {
+	# Linux doesn't need any, as we always use linux flags
+	# -dynlib is not used for clang compiler, we asume mac
+	# is clang. We could use Configure() feature to detect
+	# if needed later.
+	'Darwin' : { '-shared' : '' },
+	'Windows' : { '-shared' : '', '-fPIC' : '', '-fPIE' : '' }
+	}
+}
+
+def flags_to_os(flagtype, options):
+	if system not in _flag_map[flagtype]:
+		return options
+
+	# If were passed a str, break it to a list
+	# and then make sure you return a str.
+	listify = isinstance(options, str)
+	if listify:
+		options = options.split()
+
+	flag_map = _flag_map[flagtype][system]
+
+	# for each element in options list, see if it has a mapping and convert it.
+	options = [ flag_map[e] if e in flag_map else e  for e in options ]
+
+	# return a string with a space between the options if we were given a string, ie
+	# this routine listified it.
+	if listify:
+		options = ' '.join([s for s in options])
+
+	return options
+
+def opts_to_dict(args):
+
+	opts = {}
+	for x in shlex.split(args):
+		if x.startswith('-'):
+			k = x[0:2]
+			v = x[2:]
+			opts[k] = v
+	return opts
+
+#
+# Define custom emitters and generators
+#
+def _lemon_emitter(target, source, env):
+
+	for s in source:
+		(dirName, fileName) = os.path.split(str(s))
+		(fileBaseName, fileExtension) = os.path.splitext(fileName)
+		outHeaderName = os.path.join(dirName, fileBaseName + '.h')
+		outSrcName = os.path.join(dirName, fileBaseName + '.c')
+		target.append(outHeaderName)
+		target.append(outSrcName)
+
+	for t in target:
+		s = str(t)
+		ext = os.path.splitext(s)[1]
+		if len(ext) == 0:
+			target.remove(t)
+
+	# Figure out where the lempar template is coming from
+	# either from an EXPLICIT option string, or the hard-coded lempar.c default
+	# that is hard-coded in lemon.c. If no -T option is specified, we add it
+	# implicitly since lemon is expecting it relative to CWD and scons
+	# runs lemon from the root of the project.
+	args = env['LEMON_OPTIONS'] if 'LEMON_OPTIONS' in env else '-Tlempar.c'
+	options = opts_to_dict(args)
+
+	# Normalize the option handling any scons specific file stuff (like #/<paths>)
+	# with the File class, also handle the case of no -T option in LEMON_OPTIONS
+	dep = options['-T'] if '-T' in options else 'lempar.c'
+	dep = File(dep)
+	options['-T'] = dep.path
+
+	# Rebuild the options as a string and set the environment with it
+	options = ' '.join(['%s%s' % (key, value) for (key, value) in options.items()])
+	env['LEMON_OPTIONS'] = options
+
+	# We inform scons that our generated targets also implicitly depend on the lempar.c file
+	env.Depends(target, dep)
+	return (target, source)
+
+def _swig_emitter(target, source, env):
+	type = env['SWIGTYPE']
+	if type == None:
+		raise Exception("Must specify SWIGTYPE")
+
+	return (type + "_wrap.c", source);
+
+def __swig_gen(source, target, env, for_signature):
+
+	swiginc=""
+	for i in env['SWIGINCLUDEPATH']:
+		swiginc += "-I"+i+" "
+
+	swigout = ""
+	if 'SWIGOUTDIR' in env:
+		swigout = "-outdir " + env['SWIGOUTDIR']
+		if not os.path.isdir(env['SWIGOUTDIR']):
+			os.makedirs(env['SWIGOUTDIR'])
+
+	return 'swig -$SWIGTYPE -o $TARGET '+swiginc+' ' + swigout + ' $SOURCE'
+
+#
+# Define custom build wrapper functions
+#
+def buildFlex(NAME, SRC):
+	return env.Flex(NAME, SRC)
+
+def buildLemon(*args, **kwargs):
+	l = env.Lemon(*args, **kwargs)
+	d = env.Depends(l, os.path.join(exedir, "lemon"
+						 + env['PROGSUFFIX']))
+	return [l, d]
+
+def buildMash(SRC):
+	m = env.Mash(SRC)
+	env.Depends(m, os.path.join(exedir, "mash" + env['PROGSUFFIX']))
+	return env.Install(bindir, m)
+
+
+def buildLibrary(*args, **kwargs):
+	addFlagToKwargs(kwargs, 'CFLAGS', flags_to_os('CC', '-fPIC'))
+	l = env.Library(*args, **kwargs)
+	x = env.Install(libdir, l)
+	return [l, x]
+
+def buildModule(module):
+	return module in env["buildmod"]
+
+def getModuleLocation(module):
+	if module != "python":
+		raise TypeError("Invalid module: " + str(module))
+
+	# Install langauage specific stuff in:
+	# out/<language>/<module>/...
+	# thus Pyhton things defined in vm/SConscript will go to:
+	#   out/python/vm/...
+	base = Dir('.').path
+	base = base.split(os.path.sep)[-1]
+	return os.path.join(outdir, module, base)
+
+#
+# Given a key, such as CFLAGS, append the list
+# provided in value with the environment defaults
+# (env[key]) and populate kwargs with the value.
+#
+# This is useful for when things like buildProgram()
+# specify their own CFLAGS. This allows us to ensure
+# that global defaults, and other values can be
+# be added to them.
+#
+def addFlagToKwargs(kwargs, key, value=None):
+
+	# Preserve environment flags on the case of
+	# nothing added
+	if value == None:
+		# Nothing in kwargs attempting
+		# override or nothing in the env
+		# that can be overriden
+		if key not in kwargs or key not in env:
+			return None
+
+		# The key is in kwargs, but nothing
+		# is being added by us under the hood,
+		# so ensure we preserve the environment.
+		return env[key]
+
+	if isinstance(value, str):
+		value = [ value ]
+
+	if key not in kwargs:
+		kwargs[key] = []
+	elif isinstance(kwargs[key], str):
+		kwargs[key] = [ kwargs[key] ]
+
+	kwargs[key].extend(value)
+
+	# always append the environment
+	kwargs[key].extend(env[key] if key in env else [])
+
+def buildSharedLibrary(*args, **kwargs):
+
+	module = kwargs["MODULE"] if "MODULE" in kwargs else None
+	if(module != None):
+		ignore = not buildModule(module)
+		if ignore:
+			vprint('buildSharedLibrary ignoring target: "' + args[0] + ' module: "' + module +'"')
+			return
+		installdir = getModuleLocation(kwargs["MODULE"])
+	else:
+		installdir = libdir
+
+	addFlagToKwargs(kwargs, 'CFLAGS', flags_to_os("CC", ['-shared', '-fPIC']))
+	addFlagToKwargs(kwargs, 'LIBS')
+	addFlagToKwargs(kwargs, 'CPPDEFINES', 'BUILDING_SHARED')
+
+	l = env.SharedLibrary(*args, **kwargs)
+	x = env.Install(installdir, l)
+	return [l, x]
+
+def installFile(*args, **kwargs):
+
+	files = args
+	module = kwargs["MODULE"] if "MODULE" in kwargs else None
+
+	ignore = not buildModule(module)
+	if ignore:
+		vprint('installFile ignoring target: "' + str(files) + ' module: "' + str(module) +'"')
+		return
+
+	installdir = getModuleLocation(module)
+	x = env.Install(installdir, files)
+	return x
+
+def buildProgram(*args, **kwargs):
+	addFlagToKwargs(kwargs, 'CFLAGS', flags_to_os('CC', '-fPIE'))
+	addFlagToKwargs(kwargs, 'LIBS')
+
+	# XXX HACK TO BUILD LEMON/MASH with Clang
+	if 'BUILD_STRICT' in kwargs and not kwargs['BUILD_STRICT']:
+		if 'CFLAGS' not in kwargs:
+			kwargs['CFLAGS'] = env['CFLAGS']
+		kwargs['CFLAGS'].remove('-Wall')
+		kwargs['CFLAGS'].remove('-Werror')
+
+	l = env.Program(*args, **kwargs)
+	x = env.Install(exedir, l)
+	return [l, x]
+
+def addDoc(name, path):
+	return env.InstallAs(os.path.join(docdir, name),
+							 path)
+
+def addPrebuiltTool(name, path, layout='', prog='', comstr=None):
+
+	install_path = os.path.join(exedir, name)
+	program = prog + ' ' + '"' + install_path + '"' + ' ' + layout
+	bld = SCons.Builder.Builder(
+		action=	SCons.Action.Action(
+				program,
+				comstr)
+	)
+	env.Append(BUILDERS={name: bld})
+
+	return env.InstallAs(install_path, path)
+
+def useTool(name, target, src):
+	return getattr(env, name)(target, src)
+
+def buildSwig(*args, **kwargs):
+
+	module = kwargs["MODULE"] if "MODULE" in kwargs else None
+	if(module != None):
+		ignore = not buildModule(module)
+		if ignore:
+			vprint('buildSwig ignoring target: "' + args[0] + ' module: "' + module +'"')
+			return
+
+	swigoutdir = kwargs['SWIGOUTDIR'] if 'SWIGOUTDIR' in kwargs else getModuleLocation(module)
+	kwargs['SWIGOUTDIR'] = swigoutdir
+
+	if 'SWIGINCLUDEPATH' in kwargs:
+		o = kwargs['SWIGINCLUDEPATH']
+		if isinstance(o, str):
+			o = [ o ]
+		newpaths = list()
+		for p in Flatten(o):
+			p = Dir(p).path
+			newpaths.append(p)
+
+		kwargs['SWIGINCLUDEPATH'] = newpaths
+
+	s = env.Swig(*args, **kwargs)
+	return s
+
+#
+# Set up custom builders in environment
+#
+bld = SCons.Builder.Builder(
+	action=SCons.Action.Action(
+		'flex -i -o $TARGET $SOURCE',
+		'$FLEXCOMSTR'),
+	src_suffix='.flex'
+)
+env.Append(BUILDERS={'Flex': bld})
+
+bld = SCons.Builder.Builder(
+	action=SCons.Action.Action(
+		"lemon" + env['PROGSUFFIX'] + ' $LEMON_OPTIONS $SOURCE',
+		'$LEMONCOMSTR'),
+	emitter=_lemon_emitter
+)
+env.Append(BUILDERS={'Lemon': bld})
+
+bld = SCons.Builder.Builder(
+	action=SCons.Action.Action(
+		"mash" +  env['PROGSUFFIX'] + ' $SOURCE',
+		'$MASHCOMSTR'),
+	src_suffix='.asm',
+	suffix='.bin'
+)
+env.Append(BUILDERS={'Mash': bld})
+
+bld = SCons.Builder.Builder(
+	action=SCons.Action.CommandGeneratorAction(
+		__swig_gen,
+		{'cmdstr':'$SWIGCOMSTR'}),
+	src_suffix='.i',
+	emitter=_swig_emitter
+)
+env.Append(BUILDERS={'Swig': bld})
+
+# Find and execute all the SConanscript files
+for root, dirnames, filenames in os.walk(rootdir):
+	for filename in filenames:
+
+		# If it is a SConscript file, we append it to the list of
+		# scripts found in  tuple format. The format is
+		# ( SConscript path, module name). The module name is derived
+		# derived from the directory structure between the rootdir and the
+		# first found SConscript file. The "Module name" is used
+		# as the variant directory.
+		if outdir not in root and filename == "SConscript":
+			t = os.path.join(root, filename)
+			m = root.replace(rootdir, "")
+			m = os.path.join(outdir, m.lstrip(os.sep))
+			scripts.append((t, m))
+			vprint("Including: " + t)
+
+exports = [ 'env', 'buildProgram', 'buildSharedLibrary', 'buildLibrary', 'buildFlex', 'buildLemon', 'buildMash', 'addDoc',
+		 'addPrebuiltTool', 'useTool', 'VERBOSE', 'libdir', 'installFile', 'buildSwig', 'bindir', 'cachedir' ]
+
+for (script, module) in scripts:
+	q = os.path.join(rootdir, "out", module)
+	vprint("Executing script: " + q)
+	SConscript(script, variant_dir=q, duplicate=1, exports = exports)

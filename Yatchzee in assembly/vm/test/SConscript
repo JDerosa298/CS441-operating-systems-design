@@ -1,0 +1,33 @@
+import os
+Import('*')
+
+#Install the make-tests python script
+EXE = "python"
+SCRIPT = "tests_builder"
+SRC = "cutest-1.5/make-tests.py"
+ARGS = "-o $TARGET $SOURCES"
+COMSTR = EXE + " " + SCRIPT + " " + ARGS if VERBOSE else "GEN $TARGET"
+t = addPrebuiltTool(SCRIPT, SRC, ARGS, EXE, comstr=COMSTR)
+
+#Invoke the make-tests.py tool (which we just built)
+test_src = Glob('miniat_*/*.c')
+r = useTool('tests_builder', 'tests.c', test_src )
+
+#build and install the miniat_tests executable now that we've gathered up all the tests.
+NAME = 'miniat_tests'
+INC = ['cutest-1.5', '#/vm/inc', '#/vm/src', '#/external/lua-5.3.3/src']
+SRC = [r, test_src, 'cutest-1.5/CuTest.c']
+
+# Add the miniat source to the build directly to access non-public API.
+SRC.extend(Glob('#vm/src/*.c'))
+
+slash_bindir = bindir.replace('\\', '/')
+slash_cachedir = cachedir.replace('\\', '/')
+
+x = buildProgram(NAME, SRC, CPPPATH=INC , CPPDEFINES=[ 'BIN_OUT_DIR=\\"%s\\"' % slash_bindir, 'CACHE_DIR=\\"%s\\"' % slash_cachedir] , LIBS='liblua')
+
+#assemble all the assembly files in the asms directory.
+for file in Glob('asms/*.asm'): buildMash(file)
+
+env.Depends(r, t)
+env.Depends(x, r)

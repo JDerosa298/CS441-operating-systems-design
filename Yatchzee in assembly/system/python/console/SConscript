@@ -1,0 +1,3 @@
+Import('*')
+
+installFile("console.py", MODULE="python")

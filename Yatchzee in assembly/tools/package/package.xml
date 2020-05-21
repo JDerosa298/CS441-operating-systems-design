@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package name="libminiat">
+
+    <!-- os value is that returned by python's sys.platform() function -->
+    <extensions os="win32" type="exe" suffix=".exe"/>
+    <extensions os="win32" type="lib" suffix=".dll"/>
+
+    <extensions os="linux2" type="lib" suffix=".so" prefix="lib"/>
+    <extensions os="linux2" type="exe"/>
+
+	<!-- tools -->
+	<exe name="mash" path="out/exe/mash"/>
+
+	<!-- Generic VM Dev headers -->
+	<inc name="miniat/miniat.h" path="vm/inc/miniat/miniat.h"/>
+	<inc name="miniat/miniat.h" path="vm/inc/miniat/miniat_error.h"/>
+	<inc name="miniat/debugger.h" path="peripherals/debugger/inc/debugger.h"/>
+
+	<!-- Peripheral dev headers -->
+	<inc name="miniat/simple_kb.h" path="peripherals/simple_kb/simple_kb.h"/>
+	<inc name="miniat/simple_term.h" path="peripherals/simple_term/simple_term.h"/>
+
+	<!-- vm -->
+	<lib name="miniat" path="out/lib/miniat" />
+
+	<!-- Peripherals -->
+	<lib name="debugger" path="out/lib/debugger"/>
+	<lib name="simple_kb" path="out/lib/simple_kb"/>
+	<lib name="simple_term" path="out/lib/simple_term"/>
+
+	<!-- Documentation -->
+	<doc name="manual.pdf" path="out/doc/manual.pdf"/>
+
+	<!-- Source code examples -->
+	<src name="console/console.c" path="system/console/console.c"/>
+	<src name="console/console_connector.c" path="system/console/console_connector.c"/>
+	<src name="console/README" path="system/console/README"/>
+	<src name="console/simple_term.asm" path="system/console/simple_term.asm"/>
+	<src name="console/SConstruct" path="system/console/sbuild"/>
+
+</package>

@@ -1,0 +1,10 @@
+This directory contains scripts and data generated (in part by mash)
+that create railrod diagrams of the mash assembly language for use
+on the MiniAT.org website and in printed documentation.  Currently,
+only the image version for print and web is functional.  Another, a
+text HTML/CSS-based diagram creater, is not yet complete, and a third,
+which creates text BNF, is not yet started.
+
+To create all working image diagram models, execute the
+"bubble-generator.tcl" script (requires TCL/Tk and ImageMagick) and
+click the "Everything" button in the Tk window that appears.

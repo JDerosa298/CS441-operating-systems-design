@@ -1,0 +1,14 @@
+Import('*')
+import sys;
+
+if sys.platform.startswith('win32'):
+	curses = 'libpdcurses'
+else:
+	curses = 'libncurses'
+
+INC = [ '#/vm/inc' ]
+
+LIBS = [ 'libminiat', curses ]
+
+buildProgram('miniat_color_console', [ 'main.c', 'util.c', 'term.c', 'peripherals.c', 'keyb.c', 'macs.c', 'ports.c' ], CPPPATH=INC, LIBS=LIBS)
+buildMash('color_console_demo.asm')

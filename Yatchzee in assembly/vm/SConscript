@@ -1,0 +1,25 @@
+Import('*')
+import distutils.sysconfig
+import os
+
+NAME = 'miniat'
+
+INC =  [ 'inc', '#/external/lua-5.3.3/src' ]
+
+SRC = Glob('src/*.c')
+
+buildSharedLibrary(NAME, SRC, CPPPATH=INC, CFLAGS='-fvisibility=hidden', LIBS='liblua')
+addDoc("manual.pdf", "doc/miniat_thesis.pdf")
+
+
+# OSX and others don't allow for undefined symbols during link. In *Nix, the python symbols can be resolved
+# at load time, on OSX it frekas out
+# Don't clobber the LIBPATH set up in the SCons Environment
+libdir = distutils.sysconfig.get_config_var('LIBDIR')
+LIBPATH = [ env["LIBPATH"], libdir]
+
+lib = 'python' + distutils.sysconfig.get_config_var('VERSION')
+
+wrapper = buildSwig("src/miniat_python.i", SWIGTYPE="python", SWIGINCLUDEPATH=INC, MODULE="python")
+
+buildSharedLibrary('_'+NAME, wrapper, LIBS= [ NAME, lib ], CPPPATH=[ INC, distutils.sysconfig.get_python_inc() ], LIBPATH=LIBPATH, SHLIBPREFIX="", MODULE="python")

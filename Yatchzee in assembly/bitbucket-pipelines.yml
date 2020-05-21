@@ -1,0 +1,10 @@
+# You can use any Docker image from Docker Hub or your own container registry
+image: shootingatshadow/miniat-ubuntu-16.04:v1
+
+pipelines:
+  default:
+    - step:
+        script:  # Modify the commands below to build and test your repository.
+          - scons
+          - source miniat.env
+          - mtest

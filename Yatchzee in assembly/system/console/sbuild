@@ -1,0 +1,6 @@
+# This is an example sconscript for those building outside of the miniat tree. You should be able to build
+# By invoking scons. If not, you can alter this by specifying CPPPATH for includes and LIBPATH for the linker
+# search path. This is useful if your installing in a non default location.
+
+Program("console", "console.c", LIBS=["miniat","simple_term", "simple_kb"], CFLAGS="-g")
+Program("console_connector", "console_connector.c", LIBS=["miniat","simple_term", "simple_kb"], CFLAGS="-g")
